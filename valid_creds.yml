@@ -1,0 +1,34 @@
+- name: Retrieve Azure subscription and quota details
+  hosts: localhost
+  gather_facts: no
+  vars_files:
+    - vars.yml
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+
+  tasks:
+    - name: cli
+      register: valid_creds
+      ignore_errors: yes    
+      shell: |
+        az login --service-principal --username "{{client_id}}" --password "{{client_secret}}" --tenant "{{tenant_id}}"
+
+    - name: Remove lines with 'hello_world'
+      ansible.builtin.lineinfile:
+        path: vars.yml
+        regexp: '.*"{{item}}".*'
+        state: absent
+      loop:
+        - "{{client_id}}"
+        - "{{client_secret}}"
+        - "{{tenant_id}}"
+        - "{{subscription_id}}"
+      when: valid_creds.failed
+
+    - name: check and fail
+      assert:
+        that:
+          - not valid_creds.failed
+
+    
+        

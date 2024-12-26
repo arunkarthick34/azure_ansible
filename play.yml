@@ -1,0 +1,29 @@
+---
+- name: Retrieve Azure subscription and quota details
+  hosts: localhost
+  gather_facts: no
+  vars_files:
+    - vars.yml
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+      #    ansible_python_interpreter: /home/admin_user/azure-ansible-env/bin/python
+
+  tasks:
+    - name: cli
+      shell: |
+        az login --service-principal --username "{{client_id}}" --password "{{client_secret}}" --tenant "{{tenant_id}}"
+
+    - name: Get all locations
+      azure.azcollection.azure_rm_resource_info:
+        api_version: "2016-06-01"
+        resource_type: locations
+        subscription_id: "{{subscription_id}}"
+      register: location_info
+
+    - name: print
+      set_fact:
+        locations: "{{location_info.response | map(attribute='name') | list }}"
+
+    - name: Include task1
+      include_tasks: "location.yml"
+      loop: "{{locations}}"

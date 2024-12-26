@@ -1,0 +1,36 @@
+- name: cli
+  shell: |
+    az vm list-usage --location "{{item}}"  --out json
+  register: test
+  ignore_errors: yes
+
+- name: block of acceptable locations
+  block:
+    - name: Create a resource group
+      register: create_rg
+      azure_rm_resourcegroup:
+        name: "test{{item}}"
+        location: "{{item}}"
+
+    - name: Create a virtual network
+      when: not create_rg.failed
+      azure_rm_virtualnetwork:
+        resource_group: "test{{item}}"
+        name: "vn{{item}}"
+        address_prefixes_cidr:
+          - 10.1.0.0/16
+
+    - name: Create a subnet
+      when: not create_rg.failed
+      azure_rm_subnet:
+        resource_group:  "test{{item}}"
+        virtual_network_name:  "vn{{item}}"
+        name:  "subnet{{item}}"
+        address_prefix_cidr: "10.1.0.0/24"
+
+    - include_tasks: create_vm.yml
+      when: not create_rg.failed
+
+  when: not test.failed
+  ignore_errors: yes          
+

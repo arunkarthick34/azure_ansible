@@ -1,0 +1,32 @@
+---
+- name: Retrieve Azure subscription and quota details
+  hosts: localhost
+  gather_facts: no
+  vars_files:
+    - vars.yml
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+
+
+- name: valid creds
+  ansible.builtin.import_playbook: valid_creds.yml
+    
+- name: Run Vm creation
+  ansible.builtin.import_playbook: play.yml
+
+- name: Retrieve Azure subscription and quota details
+  hosts: localhost
+  gather_facts: no
+  vars_files:
+    - vars.yml
+  vars:
+    ansible_python_interpreter: /usr/bin/python3  
+
+  tasks:
+    - name: Execute another playbook
+      command: ansible-playbook play2.yml -i inventory
+
+# - name: configure VM
+#   ansible.builtin.import_playbook: play2.yml
+#   vars:
+#     ansible_inventory: inventory        

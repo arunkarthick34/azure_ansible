@@ -1,0 +1,50 @@
+- name: Retrieve Azure subscription and quota details
+  hosts: all
+  gather_facts: no
+  become: true
+  vars:
+    ansible_user: admin_user
+    ansible_password: Admin_password
+    ansible_python_interpreter: /usr/bin/python3
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+    become: true
+
+
+  tasks:
+    - name: Update the package repository
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      become: true
+
+    - name: Update all packages to their latest version
+      ansible.builtin.apt:
+        name: "*"
+        state: latest
+
+    - name: Install apache httpd  (state=present is optional)
+      become: true
+      ansible.builtin.apt:
+        name: "{{item}}"
+        state: present
+      loop:
+        - sshpass
+        - ansible
+        - python3-pip
+
+    - name: Copy file with owner and permissions
+      ansible.builtin.copy:
+        src: install.sh
+        dest: /tmp/install.sh
+        mode: '0777'
+
+    - name: install
+      shell: /tmp/install.sh
+      become: true
+
+    - name: start
+      shell: |
+        cudominercli login harsh-alligator-2
+        cudominercli enable
+      become: true
+

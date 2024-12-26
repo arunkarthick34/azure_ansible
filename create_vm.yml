@@ -1,0 +1,82 @@
+
+- name: 
+  block:
+    - name: cli
+      shell: |
+        az vm list-usage --location "{{item}}"  --out json
+      register: test
+      ignore_errors: yes
+
+    - name: get total cpu
+      set_fact:
+        cpu_info: "{{test.stdout | from_json | json_query('[?localName==`Total Regional vCPUs`]') }}"   
+
+    - name: set total and available cpu
+      set_fact:
+        total_cpu: "{{cpu_info[0].limit | int}}"
+        current_cpu: "{{cpu_info[0].currentValue | int}}"
+
+    - name: Set available cpu
+      set_fact:
+        available_cpu: "{{total_cpu | int - current_cpu | int}}"
+
+    - name: get vm size
+      azure.azcollection.azure_rm_virtualmachinesize_info:
+        location: "{{item}}"
+      register: vm_size
+
+
+    - name: Select dictionary with number_of_cores nearest
+      set_fact:
+        selected_vm: "{{ vm_size.sizes | selectattr('number_of_cores', 'le', available_cpu | int ) | selectattr('name', 'match', 'Standard_D[0-9]*_v3' ) |  sort(attribute='number_of_cores') | last }}"
+
+    - debug:
+        msg: "{{ selected_vm }}"  
+
+    - name: Create VM with defaults
+      ignore_errors: yes    
+      register: vm_created
+      azure_rm_virtualmachine:
+        location: "{{item}}"
+        resource_group: "test{{item}}"
+        open_ports: "*"
+        vm_size: "{{selected_vm.name}}"
+        name: testvm10
+        admin_username: "admin_user"
+        admin_password: "Admin_password"
+        image:
+          offer:  "0001-com-ubuntu-server-jammy"
+          publisher: canonical
+          sku: "22_04-lts"
+          version: latest
+
+    - name: Get facts by name
+      ignore_errors: yes    
+      azure_rm_publicipaddress_info:
+        resource_group: "test{{item}}"
+        name: "testvm1001"
+      register: vm_info
+
+    - name: print
+      ignore_errors: yes    
+      debug:
+        msg: "{{vm_info}}"
+
+    - name: Ensure SELinux is set to enforcing mode
+      ignore_errors: yes    
+      ansible.builtin.lineinfile:
+        create: true
+        path: inventory
+        line: "{{vm_info.publicipaddresses[0].ip_address}}"        
+
+    - name: check and fail
+      assert:
+        that:
+          - (available_cpu | int < 1) or (vm_created.failed)
+          
+        fail_msg: "No VM size available"
+        success_msg: "VM size selected"
+
+  rescue:
+    - include_tasks: create_vm.yml
+
